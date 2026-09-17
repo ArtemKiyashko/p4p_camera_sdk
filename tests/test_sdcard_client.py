@@ -1,7 +1,7 @@
 import struct
 
 from p4p_camera_sdk.sdcard import IOTYPE_GET_ADVANCE_SETTINGS_REQ, IOTYPE_LISTEVENT_REQ
-from p4p_camera_sdk.sdcard_client import RDT_METADATA, SdCardClient
+from p4p_camera_sdk.sdcard_client import RDT_CONTROL, SdCardClient
 
 
 class FakeSession:
@@ -38,7 +38,7 @@ def test_list_events_initializes_session_before_listing() -> None:
 def test_list_events_parses_ucon_filename_metadata() -> None:
     session = FakeSession()
     session.responses = [[
-        (RDT_METADATA, b"\x00\x0020260917_142655_995_016_N.jpg\x00"),
+        (RDT_CONTROL, b"\x00\x0020260917_142655_995_016_N.jpg\x00"),
     ]]
 
     events = SdCardClient(session).list_events(1, 2)

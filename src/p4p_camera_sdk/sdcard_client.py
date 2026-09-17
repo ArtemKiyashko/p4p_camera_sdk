@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from .relay import RelaySession
 
 RDT_FILE_DATA = 0x10000 + 0x1000004
+RDT_CONTROL = 0x10000 + 0x04
 RDT_METADATA = 0x10000 + 0x13
 LOGGER = logging.getLogger(__name__)
 FILENAME_RE = re.compile(rb"(20\d{6})_(\d{6})_\d{3}_\d{3}_N\.(?:jpg|jp\+ELE|mp4)")
@@ -60,7 +61,7 @@ class SdCardClient:
         for iotype, data in self._session.poll_ioctrl(timeout=12):
             frame_counts[iotype] = frame_counts.get(iotype, 0) + 1
             if iotype != IOTYPE_LISTEVENT_RSP:
-                if iotype != RDT_METADATA:
+                if iotype not in (RDT_CONTROL, RDT_METADATA):
                     continue
                 for match in FILENAME_RE.finditer(data):
                     start_time = int(
