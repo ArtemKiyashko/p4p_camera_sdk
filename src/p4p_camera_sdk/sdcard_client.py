@@ -50,6 +50,7 @@ class SdCardClient:
         self._channel = channel
 
     def list_events(self, begin_epoch: int, end_epoch: int) -> list[SdCardEvent]:
+        self._session.wait_for_live_stream()
         self._session.send_ioctrl(self._channel, IOTYPE_GET_ADVANCE_SETTINGS_REQ, bytes(4))
         self._session.send_ioctrl(
             self._channel,

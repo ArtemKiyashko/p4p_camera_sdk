@@ -22,6 +22,9 @@ class FakeSession:
     def send_ioctrl(self, channel: int, iotype: int, data: bytes) -> None:
         self.sent.append((channel, iotype, data))
 
+    def wait_for_live_stream(self) -> None:
+        pass
+
     def poll_ioctrl(self, timeout: float):
         yield from self.responses.pop(0)
 

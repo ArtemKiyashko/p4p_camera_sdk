@@ -326,6 +326,14 @@ class RelaySession:
         self.kcp.update(self._clock())
         self.kcp.flush()
 
+    def wait_for_live_stream(self, timeout: float = 20.0) -> None:
+        """Wait until the camera starts its unsolicited live RDT stream."""
+        live_types = {RDT_IOTYPE_BASE + 0x11, RDT_IOTYPE_BASE + 0x13}
+        for iotype, _ in self.poll_ioctrl(timeout=timeout):
+            if iotype in live_types:
+                return
+        raise TimeoutError("camera did not start the live stream")
+
     def poll_ioctrl(self, timeout: float = 5.0):
         """Yield (iotype, data) tuples for ioctrl responses received within
         `timeout` seconds. Also sends the ~1s relay_bind keepalive the real

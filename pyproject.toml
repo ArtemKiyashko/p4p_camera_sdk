@@ -1,6 +1,6 @@
 [project]
 name = "p4p-camera-sdk"
-version = "0.1.10"
+version = "0.1.11"
 description = "P4P relay/KCP and Ucon SD-card protocol primitives"
 requires-python = ">=3.12"
 dependencies = [
