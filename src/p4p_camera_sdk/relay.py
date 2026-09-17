@@ -420,7 +420,7 @@ class RelaySession:
                 if len(buf) < total:
                     return
                 self._app_buf = self._app_buf[total:]
-                if marker in (0x04, 0x13, 0x1000004):
+                if marker in (0x04, 0x11, 0x13, 0x1000004):
                     yield RDT_IOTYPE_BASE + marker, buf[RDT_HEADER_LEN:total]
                 continue
             # Unknown marker: drop one byte and try to resync rather than stall forever.
