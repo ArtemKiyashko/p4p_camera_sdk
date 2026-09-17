@@ -1,7 +1,7 @@
 # p4p-camera-sdk
 
 Reusable P4P relay/KCP and Ucon SD-card protocol primitives extracted from
-reverse-engineering a cellular `Animal seeker 4000` camera.
+reverse-engineering a cellular `B4HUNT` camera.
 
 This is intentionally model- and firmware-specific. It provides protocol
 building blocks and a relay session; it is not a universal camera driver.

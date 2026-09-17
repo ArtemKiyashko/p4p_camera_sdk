@@ -2,7 +2,7 @@
 UBox/Ucon P4P relay-path session establishment.
 
 Empirically validated against a real packet capture of the Ucon app's own
-live-view session for a 4G/cellular "Animal seeker 4000" camera
+live-view session for a 4G/cellular "B4HUNT" camera
 (2026-09-17, see /memories/repo/camera-api-findings.md): for this camera,
 the real app NEVER uses the direct P2P path at all - message types
 0x0012xxxx (camera knock, direct video) never appear anywhere in a full
