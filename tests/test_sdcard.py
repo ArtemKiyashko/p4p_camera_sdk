@@ -1,4 +1,5 @@
 from p4p_camera_sdk import parse_event_record
+from p4p_camera_sdk.credentials import encode_password
 from p4p_camera_sdk.sdcard import EVENT_TYPE_NAMES, build_list_event
 
 
@@ -28,3 +29,7 @@ def test_list_event_request_layout() -> None:
     assert len(payload) == 20
     assert payload[5:7] == b"\x00<"
     assert payload[8:16] == bytes.fromhex("4433221188776655")
+
+
+def test_password_encoding_uses_vendor_alphabet() -> None:
+    assert encode_password("password") == "rgqoFHiJ6Aw9nYFzFVrPDHdIcrE,"

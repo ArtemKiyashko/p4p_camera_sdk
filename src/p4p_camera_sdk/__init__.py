@@ -1,8 +1,17 @@
 """Reusable P4P relay/KCP and Ucon SD-card protocol primitives."""
 
+from .credentials import CredentialClient, DeviceCredentials, encode_password
 from .sdcard import EventRecord, parse_event_record
 
-__all__ = ["RDT_IOTYPE_BASE", "EventRecord", "RelaySession", "parse_event_record"]
+__all__ = [
+	"RDT_IOTYPE_BASE",
+	"CredentialClient",
+	"DeviceCredentials",
+	"EventRecord",
+	"RelaySession",
+	"encode_password",
+	"parse_event_record",
+]
 
 
 def __getattr__(name: str):
