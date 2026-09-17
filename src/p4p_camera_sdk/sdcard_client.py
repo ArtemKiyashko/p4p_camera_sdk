@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import logging
+import re
 import struct
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .sdcard import (
     FILE_TYPE_VIDEO,
     IOTYPE_DOWNLOAD_VIDEO_FILE_REQ,
-    IOTYPE_DOWNLOAD_VIDEO_FILE_RSP,
     IOTYPE_GET_ADVANCE_SETTINGS_REQ,
     IOTYPE_LISTEVENT_REQ,
     IOTYPE_LISTEVENT_RSP,
@@ -20,7 +21,6 @@ from .sdcard import (
     build_download_sd_file,
     build_list_event,
     build_video_file_data,
-    parse_download_sd_file_response,
     parse_event_record,
     parse_list_event_response,
 )
@@ -29,7 +29,9 @@ if TYPE_CHECKING:
     from .relay import RelaySession
 
 RDT_FILE_DATA = 0x10000 + 0x1000004
+RDT_METADATA = 0x10000 + 0x13
 LOGGER = logging.getLogger(__name__)
+FILENAME_RE = re.compile(rb"(20\d{6})_(\d{6})_\d{3}_\d{3}_N\.(?:jpg|jp\+ELE|mp4)")
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +60,19 @@ class SdCardClient:
         for iotype, data in self._session.poll_ioctrl(timeout=12):
             frame_counts[iotype] = frame_counts.get(iotype, 0) + 1
             if iotype != IOTYPE_LISTEVENT_RSP:
+                if iotype != RDT_METADATA:
+                    continue
+                for match in FILENAME_RE.finditer(data):
+                    start_time = int(
+                        datetime.strptime(
+                            f"{match.group(1).decode()}_{match.group(2).decode()}",
+                            "%Y%m%d_%H%M%S",
+                        )
+                        .replace(tzinfo=UTC)
+                        .timestamp()
+                    )
+                    if not any(event.start_time == start_time for event in events):
+                        events.append(SdCardEvent(start_time, 0, 4, 0, 0))
                 continue
             response = parse_list_event_response(data)
             events.extend(
@@ -87,18 +102,10 @@ class SdCardClient:
                 event.src_status,
             ),
         )
-        metadata = None
-        for iotype, data in self._session.poll_ioctrl(timeout=12):
-            if iotype == IOTYPE_DOWNLOAD_VIDEO_FILE_RSP:
-                metadata = parse_download_sd_file_response(data)
-                break
-        if metadata is None or metadata.total_size <= 0:
-            raise RuntimeError("camera did not return video metadata")
-
-        content = bytearray(metadata.total_size)
+        content = bytearray()
         offset = 0
-        while offset < metadata.total_size:
-            size = min(VIDEO_FILE_DATA_CHUNK_SIZE, metadata.total_size - offset)
+        while True:
+            size = VIDEO_FILE_DATA_CHUNK_SIZE
             self._session.send_ioctrl(
                 self._channel,
                 IOTYPE_VIDEO_FILE_DATA_REQ,
@@ -112,8 +119,12 @@ class SdCardClient:
                 ),
             )
             block = self._receive_block(offset)
-            content[offset:offset + len(block)] = block
-            offset += size
+            content.extend(block)
+            offset += len(block)
+            if len(block) < size:
+                break
+            if offset > 100 * 1024 * 1024:
+                raise RuntimeError("camera video exceeded the 100 MiB transfer limit")
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(content)
         return len(content)

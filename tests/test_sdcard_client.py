@@ -1,7 +1,7 @@
 import struct
 
 from p4p_camera_sdk.sdcard import IOTYPE_GET_ADVANCE_SETTINGS_REQ, IOTYPE_LISTEVENT_REQ
-from p4p_camera_sdk.sdcard_client import SdCardClient
+from p4p_camera_sdk.sdcard_client import RDT_METADATA, SdCardClient
 
 
 class FakeSession:
@@ -33,3 +33,15 @@ def test_list_events_initializes_session_before_listing() -> None:
     assert [item[1] for item in session.sent] == [IOTYPE_GET_ADVANCE_SETTINGS_REQ, IOTYPE_LISTEVENT_REQ]
     assert events[0].start_time == 1_700_000_000
     assert events[0].length == 30
+
+
+def test_list_events_parses_ucon_filename_metadata() -> None:
+    session = FakeSession()
+    session.responses = [[
+        (RDT_METADATA, b"\x00\x0020260917_142655_995_016_N.jpg\x00"),
+    ]]
+
+    events = SdCardClient(session).list_events(1, 2)
+
+    assert len(events) == 1
+    assert events[0].start_time == 1_789_655_215
