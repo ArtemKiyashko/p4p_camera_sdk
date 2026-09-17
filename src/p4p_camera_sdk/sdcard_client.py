@@ -23,6 +23,7 @@ from .sdcard import (
     build_video_file_data,
     parse_event_record,
     parse_list_event_response,
+    parse_rdt_event_records,
 )
 
 if TYPE_CHECKING:
@@ -64,6 +65,17 @@ class SdCardClient:
             if iotype != IOTYPE_LISTEVENT_RSP:
                 if iotype not in (RDT_CONTROL, RDT_METADATA):
                     continue
+                for record in parse_rdt_event_records(data):
+                    if not any(event.start_time == record.start_time for event in events):
+                        events.append(
+                            SdCardEvent(
+                                start_time=record.start_time,
+                                length=record.length,
+                                event_type=record.event_type,
+                                src_event=record.src_event,
+                                src_status=record.src_status,
+                            )
+                        )
                 for match in FILENAME_RE.finditer(data):
                     start_time = int(
                         datetime.strptime(

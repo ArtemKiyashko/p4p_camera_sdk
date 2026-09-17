@@ -13,7 +13,7 @@ wire-format internals.
 Install a pinned release in production:
 
 ```sh
-pip install p4p-camera-sdk==0.1.11
+pip install p4p-camera-sdk==0.1.12
 ```
 
 Use the Git repository or an editable install only for SDK development. Tag

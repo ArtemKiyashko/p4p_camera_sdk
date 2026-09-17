@@ -135,6 +135,31 @@ def parse_list_event_response(data: bytes) -> EventListResponse:
     return EventListResponse(channel=channel, count=count, total=total, records=records)
 
 
+def parse_rdt_event_records(data: bytes) -> list[EventRecord]:
+    """Parse the 8-byte records carried by Ucon RDT control responses.
+
+    The RDT form stores duration at bytes 0:2, event type at byte 2, status
+    at byte 3, and the start timestamp at bytes 4:8.
+    """
+    records: list[EventRecord] = []
+    for offset in range(0, len(data) - 7, 8):
+        record = data[offset:offset + 8]
+        event = record[2]
+        if event not in EVENT_TYPE_NAMES:
+            continue
+        records.append(
+            EventRecord(
+                start_time=struct.unpack_from("<I", record, 4)[0],
+                length=struct.unpack_from("<H", record, 0)[0],
+                event_type=event,
+                src_event=event,
+                src_status=record[3],
+                driving_mode=False,
+            )
+        )
+    return records
+
+
 def build_event_calendar(begin_epoch: int, end_epoch: int) -> bytes:
     """getEventCalendar(begin, end) -> IOTYPE_RECORD_BITMAP_REQ (258).
     20-byte payload:

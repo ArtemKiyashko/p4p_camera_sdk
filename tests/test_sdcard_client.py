@@ -48,3 +48,14 @@ def test_list_events_parses_ucon_filename_metadata() -> None:
 
     assert len(events) == 1
     assert events[0].start_time == 1_789_655_215
+
+
+def test_list_events_parses_rdt_event_records() -> None:
+    session = FakeSession()
+    session.responses = [[(RDT_CONTROL, bytes.fromhex("050004013b36ab6a"))]]
+
+    events = SdCardClient(session).list_events(1, 2)
+
+    assert events[0].start_time == 0x6AAB363B
+    assert events[0].length == 5
+    assert events[0].event_type == 4
