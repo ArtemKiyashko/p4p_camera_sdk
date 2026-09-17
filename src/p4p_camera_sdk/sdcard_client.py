@@ -12,6 +12,8 @@ from .sdcard import (
     FILE_TYPE_VIDEO,
     IOTYPE_DOWNLOAD_VIDEO_FILE_REQ,
     IOTYPE_DOWNLOAD_VIDEO_FILE_RSP,
+    IOTYPE_GET_ADVANCE_SETTINGS_REQ,
+    IOTYPE_GET_ADVANCE_SETTINGS_RSP,
     IOTYPE_LISTEVENT_REQ,
     IOTYPE_LISTEVENT_RSP,
     IOTYPE_VIDEO_FILE_DATA_REQ,
@@ -46,6 +48,15 @@ class SdCardClient:
         self._channel = channel
 
     def list_events(self, begin_epoch: int, end_epoch: int) -> list[SdCardEvent]:
+        self._session.send_ioctrl(self._channel, IOTYPE_GET_ADVANCE_SETTINGS_REQ, bytes(4))
+        advance_settings_received = False
+        for iotype, _ in self._session.poll_ioctrl(timeout=8):
+            if iotype == IOTYPE_GET_ADVANCE_SETTINGS_RSP:
+                advance_settings_received = True
+                break
+        if not advance_settings_received:
+            raise TimeoutError("camera did not accept the SD-card session initialization")
+
         self._session.send_ioctrl(
             self._channel,
             IOTYPE_LISTEVENT_REQ,
