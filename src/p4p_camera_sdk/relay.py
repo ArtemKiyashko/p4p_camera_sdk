@@ -328,7 +328,7 @@ class RelaySession:
 
     def wait_for_live_stream(self, timeout: float = 20.0) -> None:
         """Wait until the camera starts its unsolicited live RDT stream."""
-        live_types = {RDT_IOTYPE_BASE + 0x11, RDT_IOTYPE_BASE + 0x13}
+        live_types = {RDT_IOTYPE_BASE + 0x11}
         for iotype, _ in self.poll_ioctrl(timeout=timeout):
             if iotype in live_types:
                 return
