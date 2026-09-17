@@ -2,6 +2,7 @@
 
 from .credentials import CredentialClient, DeviceCredentials, encode_password
 from .sdcard import EventRecord, parse_event_record
+from .sdcard_client import SdCardClient, SdCardEvent
 
 __all__ = [
 	"RDT_IOTYPE_BASE",
@@ -9,6 +10,8 @@ __all__ = [
 	"DeviceCredentials",
 	"EventRecord",
 	"RelaySession",
+	"SdCardClient",
+	"SdCardEvent",
 	"encode_password",
 	"parse_event_record",
 ]
