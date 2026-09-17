@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import struct
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from .relay import RelaySession
 
 RDT_FILE_DATA = 0x10000 + 0x1000004
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +52,9 @@ class SdCardClient:
             build_list_event(begin_epoch, end_epoch, self._channel),
         )
         events: list[SdCardEvent] = []
+        frame_counts: dict[int, int] = {}
         for iotype, data in self._session.poll_ioctrl(timeout=12):
+            frame_counts[iotype] = frame_counts.get(iotype, 0) + 1
             if iotype != IOTYPE_LISTEVENT_RSP:
                 continue
             response = parse_list_event_response(data)
@@ -66,6 +70,7 @@ class SdCardClient:
                 for record in [parse_event_record(raw)]
                 if record.length > 0
             )
+        LOGGER.info("SD event-list response frames: %s", frame_counts)
         return events
 
     def download_video(self, event: SdCardEvent, destination: Path) -> int:
