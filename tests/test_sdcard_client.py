@@ -8,7 +8,6 @@ class FakeSession:
     def __init__(self) -> None:
         self.sent: list[tuple[int, int, bytes]] = []
         self.responses = [
-            [(961, bytes(44))],
             [(257, self._event_response())],
         ]
 
