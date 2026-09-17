@@ -1,0 +1,34 @@
+[project]
+name = "p4p-camera-sdk"
+version = "0.1.0"
+description = "P4P relay/KCP and Ucon SD-card protocol primitives"
+requires-python = ">=3.12"
+dependencies = [
+    "kcp>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2,<2.0",
+    "pytest>=8.0,<9.0",
+    "ruff>=0.6,<1.0",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint.per-file-ignores]
+"src/p4p_camera_sdk/p4p_crypto.py" = ["BLE001"]
+"src/p4p_camera_sdk/relay.py" = ["BLE001", "PYI034", "S110", "S112", "UP041", "UP037", "RUF059"]

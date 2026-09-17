@@ -1,0 +1,5 @@
+This project includes protocol code derived from the MIT-licensed project:
+https://github.com/mahumadad/ubox-p4p
+
+The SD-card ioctl builders/parsers and Ucon-specific relay behavior are
+independent reverse-engineering work for the Ucon/UBIA SDK family.
