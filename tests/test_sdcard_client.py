@@ -5,11 +5,16 @@ from p4p_camera_sdk.sdcard import (
     IOTYPE_GET_ADVANCE_SETTINGS_REQ,
     IOTYPE_LISTEVENT_REQ,
     IOTYPE_VIDEO_FILE_DATA_REQ,
+    build_list_event,
 )
 from p4p_camera_sdk.sdcard_client import (
     IOTYPE_SD_LIVE_COMPANION_REQ,
     RDT_CONTROL,
     RDT_FILE_DATA,
+    SD_AVCTRL_PARAM,
+    SD_AVCTRL_ST_TIME_DAY,
+    SD_LIVE_COMPANION_AFTER_LIST,
+    SD_LIVE_COMPANION_INITIAL,
     SdCardClient,
     SdCardEvent,
 )
@@ -34,6 +39,10 @@ class FakeSession:
     def send_ioctrl(self, channel: int, iotype: int, data: bytes) -> None:
         self.sent.append((channel, iotype, data))
 
+    def send_ioctrl_batch(self, channel: int, commands: list[tuple[int, bytes]]) -> None:
+        for iotype, data in commands:
+            self.send_ioctrl(channel, iotype, data)
+
     def send_avctrl(self, command: int, **kwargs) -> None:
         self.avctrl.append((command, kwargs))
 
@@ -52,9 +61,26 @@ def test_list_events_initializes_session_before_listing() -> None:
         IOTYPE_GET_ADVANCE_SETTINGS_REQ,
         IOTYPE_SD_LIVE_COMPANION_REQ,
         IOTYPE_LISTEVENT_REQ,
-        IOTYPE_GET_ADVANCE_SETTINGS_REQ,
+        IOTYPE_SD_LIVE_COMPANION_REQ,
     ]
-    assert session.avctrl == [(2, {"playrecord": 0, "streamindex": 0, "with_audio": 1, "param": 0})]
+    assert [item[2] for item in session.sent] == [
+        bytes(4),
+        SD_LIVE_COMPANION_INITIAL,
+        build_list_event(1, 2),
+        SD_LIVE_COMPANION_AFTER_LIST,
+    ]
+    assert session.avctrl == [
+        (
+            2,
+            {
+                "playrecord": 0,
+                "streamindex": 0,
+                "with_audio": 1,
+                "st_time_day": SD_AVCTRL_ST_TIME_DAY,
+                "param": SD_AVCTRL_PARAM,
+            },
+        )
+    ]
     assert events[0].start_time == 1_700_000_000
     assert events[0].length == 30
 

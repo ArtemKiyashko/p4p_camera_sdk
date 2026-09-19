@@ -321,9 +321,12 @@ class RelaySession:
         return (int(time.time() * 1000) - self._ts_base) & 0xFFFFFFFF
 
     def send_ioctrl(self, channel: int, iotype: int, data: bytes) -> None:
+        self.send_ioctrl_batch(channel, [(iotype, data)])
+
+    def send_ioctrl_batch(self, channel: int, commands: list[tuple[int, bytes]]) -> None:
         assert self.kcp is not None
-        frame = build_ioctrl_frame(channel, iotype, data)
-        self.kcp.enqueue(frame)
+        for iotype, data in commands:
+            self.kcp.enqueue(build_ioctrl_frame(channel, iotype, data))
         self.kcp.update(self._clock())
         self.kcp.flush()
 

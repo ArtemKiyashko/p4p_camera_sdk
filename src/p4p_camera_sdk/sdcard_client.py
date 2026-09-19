@@ -33,7 +33,11 @@ if TYPE_CHECKING:
 RDT_FILE_DATA = 0x10000 + 0x1000004
 RDT_CONTROL = 0x10000 + 0x04
 RDT_METADATA = 0x10000 + 0x13
-IOTYPE_SD_LIVE_COMPANION_REQ = 0x211A
+IOTYPE_SD_LIVE_COMPANION_REQ = 0x07074C3F
+SD_LIVE_COMPANION_INITIAL = bytes.fromhex("6d0c0c25")
+SD_LIVE_COMPANION_AFTER_LIST = bytes.fromhex("4f0c0cff")
+SD_AVCTRL_ST_TIME_DAY = 0x07074C3F
+SD_AVCTRL_PARAM = 0x3F0C0C4C
 SD_LIST_TIMEOUT = 90.0
 SD_DOWNLOAD_METADATA_TIMEOUT = 60.0
 LOGGER = logging.getLogger(__name__)
@@ -56,15 +60,29 @@ class SdCardClient:
 
     def list_events(self, begin_epoch: int, end_epoch: int) -> list[SdCardEvent]:
         self._session.wait_for_live_stream()
-        self._session.send_ioctrl(self._channel, IOTYPE_GET_ADVANCE_SETTINGS_REQ, bytes(4))
-        self._session.send_ioctrl(self._channel, IOTYPE_SD_LIVE_COMPANION_REQ, bytes(4))
-        self._session.send_avctrl(2, playrecord=0, streamindex=0, with_audio=1, param=0)
+        self._session.send_ioctrl_batch(
+            self._channel,
+            [
+                (IOTYPE_GET_ADVANCE_SETTINGS_REQ, bytes(4)),
+                (IOTYPE_SD_LIVE_COMPANION_REQ, SD_LIVE_COMPANION_INITIAL),
+            ],
+        )
+        self._session.send_avctrl(
+            2,
+            playrecord=0,
+            streamindex=0,
+            with_audio=1,
+            st_time_day=SD_AVCTRL_ST_TIME_DAY,
+            param=SD_AVCTRL_PARAM,
+        )
         self._session.send_ioctrl(
             self._channel,
             IOTYPE_LISTEVENT_REQ,
             build_list_event(begin_epoch, end_epoch, self._channel),
         )
-        self._session.send_ioctrl(self._channel, IOTYPE_GET_ADVANCE_SETTINGS_REQ, bytes(4))
+        self._session.send_ioctrl(
+            self._channel, IOTYPE_SD_LIVE_COMPANION_REQ, SD_LIVE_COMPANION_AFTER_LIST
+        )
         events: list[SdCardEvent] = []
         frame_counts: dict[int, int] = {}
         for iotype, data in self._session.poll_ioctrl(timeout=SD_LIST_TIMEOUT):
