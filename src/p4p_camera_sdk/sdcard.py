@@ -141,6 +141,8 @@ def parse_rdt_event_records(data: bytes) -> list[EventRecord]:
     The RDT form stores duration at bytes 0:2, event type at byte 2, status
     at byte 3, and the start timestamp at bytes 4:8.
     """
+    if len(data) % 8:
+        return []
     records: list[EventRecord] = []
     for offset in range(0, len(data) - 7, 8):
         record = data[offset:offset + 8]

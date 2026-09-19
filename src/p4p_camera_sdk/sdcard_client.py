@@ -6,13 +6,13 @@ import logging
 import re
 import struct
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .sdcard import (
     FILE_TYPE_VIDEO,
     IOTYPE_DOWNLOAD_VIDEO_FILE_REQ,
+    IOTYPE_DOWNLOAD_VIDEO_FILE_RSP,
     IOTYPE_GET_ADVANCE_SETTINGS_REQ,
     IOTYPE_LISTEVENT_REQ,
     IOTYPE_LISTEVENT_RSP,
@@ -21,6 +21,7 @@ from .sdcard import (
     build_download_sd_file,
     build_list_event,
     build_video_file_data,
+    parse_download_sd_file_response,
     parse_event_record,
     parse_list_event_response,
     parse_rdt_event_records,
@@ -32,6 +33,9 @@ if TYPE_CHECKING:
 RDT_FILE_DATA = 0x10000 + 0x1000004
 RDT_CONTROL = 0x10000 + 0x04
 RDT_METADATA = 0x10000 + 0x13
+IOTYPE_SD_LIVE_COMPANION_REQ = 0x211A
+SD_LIST_TIMEOUT = 90.0
+SD_DOWNLOAD_METADATA_TIMEOUT = 60.0
 LOGGER = logging.getLogger(__name__)
 FILENAME_RE = re.compile(rb"(20\d{6})_(\d{6})_\d{3}_\d{3}_N\.(?:jpg|jp\+ELE|mp4)")
 
@@ -53,40 +57,35 @@ class SdCardClient:
     def list_events(self, begin_epoch: int, end_epoch: int) -> list[SdCardEvent]:
         self._session.wait_for_live_stream()
         self._session.send_ioctrl(self._channel, IOTYPE_GET_ADVANCE_SETTINGS_REQ, bytes(4))
+        self._session.send_ioctrl(self._channel, IOTYPE_SD_LIVE_COMPANION_REQ, bytes(4))
+        self._session.send_avctrl(2, playrecord=0, streamindex=0, with_audio=1, param=0)
         self._session.send_ioctrl(
             self._channel,
             IOTYPE_LISTEVENT_REQ,
             build_list_event(begin_epoch, end_epoch, self._channel),
         )
+        self._session.send_ioctrl(self._channel, IOTYPE_GET_ADVANCE_SETTINGS_REQ, bytes(4))
         events: list[SdCardEvent] = []
         frame_counts: dict[int, int] = {}
-        for iotype, data in self._session.poll_ioctrl(timeout=12):
+        for iotype, data in self._session.poll_ioctrl(timeout=SD_LIST_TIMEOUT):
             frame_counts[iotype] = frame_counts.get(iotype, 0) + 1
             if iotype != IOTYPE_LISTEVENT_RSP:
                 if iotype not in (RDT_CONTROL, RDT_METADATA):
                     continue
-                for record in parse_rdt_event_records(data):
-                    if not any(event.start_time == record.start_time for event in events):
-                        events.append(
-                            SdCardEvent(
-                                start_time=record.start_time,
-                                length=record.length,
-                                event_type=record.event_type,
-                                src_event=record.src_event,
-                                src_status=record.src_status,
+                if iotype == RDT_CONTROL:
+                    for record in parse_rdt_event_records(data):
+                        if not begin_epoch <= record.start_time <= end_epoch:
+                            continue
+                        if not any(event.start_time == record.start_time for event in events):
+                            events.append(
+                                SdCardEvent(
+                                    start_time=record.start_time,
+                                    length=record.length,
+                                    event_type=record.event_type,
+                                    src_event=record.src_event,
+                                    src_status=record.src_status,
+                                )
                             )
-                        )
-                for match in FILENAME_RE.finditer(data):
-                    start_time = int(
-                        datetime.strptime(
-                            f"{match.group(1).decode()}_{match.group(2).decode()}",
-                            "%Y%m%d_%H%M%S",
-                        )
-                        .replace(tzinfo=UTC)
-                        .timestamp()
-                    )
-                    if not any(event.start_time == start_time for event in events):
-                        events.append(SdCardEvent(start_time, 0, 4, 0, 0))
                 continue
             response = parse_list_event_response(data)
             events.extend(
@@ -116,6 +115,7 @@ class SdCardClient:
                 event.src_status,
             ),
         )
+        self._receive_download_metadata()
         content = bytearray()
         offset = 0
         while True:
@@ -142,6 +142,24 @@ class SdCardClient:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(content)
         return len(content)
+
+    def _receive_download_metadata(self) -> None:
+        for iotype, data in self._session.poll_ioctrl(timeout=SD_DOWNLOAD_METADATA_TIMEOUT):
+            if iotype == IOTYPE_DOWNLOAD_VIDEO_FILE_RSP:
+                metadata = parse_download_sd_file_response(data)
+                LOGGER.info(
+                    "SD download metadata: file=%s size=%d checksum=%s",
+                    metadata.file_name,
+                    metadata.total_size,
+                    metadata.checksum_hex,
+                )
+                return
+            if iotype == RDT_CONTROL:
+                match = FILENAME_RE.search(data)
+                if match:
+                    LOGGER.info("SD RDT download metadata: file=%s", match.group().decode("ascii"))
+                    return
+        raise TimeoutError("timed out waiting for SD download metadata")
 
     def _receive_block(self, expected_offset: int) -> bytes:
         for iotype, data in self._session.poll_ioctrl(timeout=8):

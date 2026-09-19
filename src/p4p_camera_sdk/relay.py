@@ -243,7 +243,9 @@ class RelaySession:
                 pass
         print(f"[relay] wake burst: {wake_sent} knocks sent to {len(relay_targets)} relays; "
               f"{len(wake_responders)} ACKed: {sorted(wake_responders)}", file=sys.stderr)
-        targets = list(wake_responders) if wake_responders else relay_targets
+        targets = [
+            target for target in relay_targets if target in wake_responders
+        ][:1] or relay_targets[:1]
 
         streamreq = encode(build_rlystreamreq(self.uid, self.password, conv4, local_ip, local_port))
         for host, port in targets:
@@ -302,11 +304,10 @@ class RelaySession:
         def on_out(_kcp_inst, raw):
             sock.sendto(wrap_relay_kcp(bytes(raw), routing_tag), relay_addr)
 
-        kcp.set_window_size(512, 512)
-        try:
-            kcp.set_performance_options(0, 0, 0, 1)
-        except Exception:
-            pass
+        # Match native p4p_kcp_mode(kcp, 2): ikcp_wndsize(128, 256) and
+        # ikcp_nodelay(1, 10, 0, 1).
+        kcp.set_window_size(128, 256)
+        kcp.set_performance_options(True, 10, 0, True)
 
         self.sock = sock
         self.relay_addr = relay_addr
@@ -322,6 +323,47 @@ class RelaySession:
     def send_ioctrl(self, channel: int, iotype: int, data: bytes) -> None:
         assert self.kcp is not None
         frame = build_ioctrl_frame(channel, iotype, data)
+        self.kcp.enqueue(frame)
+        self.kcp.update(self._clock())
+        self.kcp.flush()
+
+    def send_avctrl(
+        self,
+        command: int,
+        *,
+        playrecord: int = 1,
+        streamindex: int = 0,
+        with_audio: int = 1,
+        reqseq: int = 0,
+        capability: int = 0,
+        optionflag: int = 0,
+        st_time_day: int = 0,
+        param: int = 0,
+    ) -> None:
+        """Send a native stP4PAVCmd (device.*EventRecord() family) frame.
+
+        Confirmed byte-for-byte against a real Ucon capture: sent as a raw
+        32-byte block directly in the KCP reliable stream (u32 marker=1, u32
+        reserved=0, u32 size=16, u32 reserved=0, followed by the 16-byte
+        stP4PAVCmd struct) - NOT wrapped in our 0x0003 ioctl envelope. The
+        leading 8-byte marker/reserved pair (distinguishing this frame type
+        from the ioctl envelope's marker=3) was previously missing here,
+        which desynced the relay's stream parser for everything sent after.
+        """
+        assert self.kcp is not None
+        payload = struct.pack(
+            "<BBBBhBBii",
+            command & 0xFF,
+            playrecord & 0xFF,
+            streamindex & 0xFF,
+            with_audio & 0xFF,
+            reqseq,
+            capability & 0xFF,
+            optionflag & 0xFF,
+            st_time_day,
+            param,
+        )
+        frame = struct.pack("<IIII", 1, 0, len(payload), 0) + payload
         self.kcp.enqueue(frame)
         self.kcp.update(self._clock())
         self.kcp.flush()
